@@ -41,3 +41,60 @@ def extract_markdown_links(text):
     pattern = r'(?<!!)\[([^\]]+)\]\(([^\)]+)\)'
     return re.findall(pattern, text)
 
+
+def split_nodes_image(old_nodes):
+    """
+    Splits TextNodes of type TEXT into sequences of TextNodes based on markdown images.
+    For example, 'text ![alt](url) text' -> [TEXT, IMAGE, TEXT]
+    """
+    new_nodes = []
+    image_pattern = r'!\[([^\]]*)\]\(([^\)]+)\)'
+    for node in old_nodes:
+        if node.text_type != TextType.TEXT:
+            new_nodes.append(node)
+            continue
+        text = node.text
+        last_idx = 0
+        for match in re.finditer(image_pattern, text):
+            start, end = match.span()
+            alt, url = match.groups()
+            if start > last_idx:
+                pre_text = text[last_idx:start]
+                if pre_text:
+                    new_nodes.append(TextNode(pre_text, TextType.TEXT))
+            new_nodes.append(TextNode(alt, TextType.IMAGE, url))
+            last_idx = end
+        if last_idx < len(text):
+            post_text = text[last_idx:]
+            if post_text:
+                new_nodes.append(TextNode(post_text, TextType.TEXT))
+    return new_nodes
+
+def split_nodes_link(old_nodes):
+    """
+    Splits TextNodes of type TEXT into sequences of TextNodes based on markdown links.
+    For example, 'text [anchor](url) text' -> [TEXT, LINK, TEXT]
+    """
+    new_nodes = []
+    link_pattern = r'(?<!!)\[([^\]]+)\]\(([^\)]+)\)'
+    for node in old_nodes:
+        if node.text_type != TextType.TEXT:
+            new_nodes.append(node)
+            continue
+        text = node.text
+        last_idx = 0
+        for match in re.finditer(link_pattern, text):
+            start, end = match.span()
+            anchor, url = match.groups()
+            if start > last_idx:
+                pre_text = text[last_idx:start]
+                if pre_text:
+                    new_nodes.append(TextNode(pre_text, TextType.TEXT))
+            new_nodes.append(TextNode(anchor, TextType.LINK, url))
+            last_idx = end
+        if last_idx < len(text):
+            post_text = text[last_idx:]
+            if post_text:
+                new_nodes.append(TextNode(post_text, TextType.TEXT))
+    return new_nodes
+

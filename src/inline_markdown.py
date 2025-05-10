@@ -23,6 +23,19 @@ def split_nodes_delimiter(old_nodes, delimiter, text_type):
     return new_nodes
 
 
+def text_to_textnodes(text):
+    """
+    Converts a markdown-flavored text string into a list of TextNode objects.
+    Handles images, links, bold (**), italic (_), and code (`) formatting.
+    """
+    nodes = [TextNode(text, TextType.TEXT)]
+    # Order: image, link, bold, italic, code
+    nodes = split_nodes_image(nodes)
+    nodes = split_nodes_link(nodes)
+    nodes = split_nodes_delimiter(nodes, "**", TextType.BOLD)
+    nodes = split_nodes_delimiter(nodes, "_", TextType.ITALIC)
+    nodes = split_nodes_delimiter(nodes, "`", TextType.CODE)
+    return [node for node in nodes if node.text or node.text_type in (TextType.IMAGE, TextType.LINK)]
 def extract_markdown_images(text):
     """
     Extracts markdown images from text.

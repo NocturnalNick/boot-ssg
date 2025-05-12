@@ -1,5 +1,43 @@
 from textnode import TextNode, TextType
+from enum import Enum
 import re
+
+class BlockType(Enum):
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    CODE = "code"
+    QUOTE = "quote"
+    UNORDERED_LIST = "unordered_list"
+    ORDERED_LIST = "ordered_list"
+
+def block_to_block_type(block: str) -> BlockType:
+    """
+    Determines the type of markdown block.
+    Assumes block is stripped of leading/trailing whitespace.
+    """
+    lines = block.split("\n")
+    # Heading: starts with 1-6 #, then space
+    if len(lines) == 1 and re.match(r"^#{1,6} ", lines[0]):
+        return BlockType.HEADING
+    # Code block: starts and ends with 3 backticks
+    if lines[0].startswith("```") and lines[-1].startswith("```") and len(lines) >= 2:
+        return BlockType.CODE
+    # Quote: every line starts with '>'
+    if all(line.startswith(">") for line in lines):
+        return BlockType.QUOTE
+    # Unordered list: every line starts with '- '
+    if all(line.startswith("- ") for line in lines):
+        return BlockType.UNORDERED_LIST
+    # Ordered list: every line starts with incrementing number, dot, space
+    is_ordered = True
+    for idx, line in enumerate(lines):
+        if not re.match(rf"^{idx+1}\. ", line):
+            is_ordered = False
+            break
+    if is_ordered and len(lines) > 0:
+        return BlockType.ORDERED_LIST
+    # Default: paragraph
+    return BlockType.PARAGRAPH
 
 
 def split_nodes_delimiter(old_nodes, delimiter, text_type):
@@ -110,4 +148,15 @@ def split_nodes_link(old_nodes):
             if post_text:
                 new_nodes.append(TextNode(post_text, TextType.TEXT))
     return new_nodes
+
+
+def markdown_to_blocks(markdown):
+    """
+    Splits a raw Markdown string into a list of block strings, separated by double newlines.
+    Each block is stripped of leading/trailing whitespace; empty blocks are removed.
+    """
+    # Normalize newlines
+    blocks = markdown.split("\n\n")
+    result = [block.strip() for block in blocks if block.strip() != ""]
+    return result
 

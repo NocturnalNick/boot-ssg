@@ -5,6 +5,7 @@ from inline_markdown import (
     extract_markdown_links,
     split_nodes_image,
     split_nodes_link,
+    markdown_to_blocks,
 )
 
 from textnode import TextNode, TextType
@@ -281,6 +282,79 @@ class TestInlineMarkdown(unittest.TestCase):
         ]
         result = text_to_textnodes(text)
         self.assertListEqual(result, expected)
+
+    def test_markdown_to_blocks(self):
+        md = """
+This is **bolded** paragraph
+
+This is another paragraph with _italic_ text and `code` here
+This is the same paragraph on a new line
+
+- This is a list
+- with items
+"""
+        blocks = markdown_to_blocks(md)
+        self.assertEqual(
+            blocks,
+            [
+                "This is **bolded** paragraph",
+                "This is another paragraph with _italic_ text and `code` here\nThis is the same paragraph on a new line",
+                "- This is a list\n- with items",
+            ],
+        )
+
+class TestBlockToBlockType(unittest.TestCase):
+    def test_heading_blocks(self):
+        self.assertEqual(block_to_block_type("# Heading"), BlockType.HEADING)
+        self.assertEqual(block_to_block_type("###### H6 heading"), BlockType.HEADING)
+        self.assertEqual(block_to_block_type("### Multiple # heading"), BlockType.HEADING)
+        self.assertNotEqual(block_to_block_type("####### Too many hashes"), BlockType.HEADING)
+
+    def test_code_blocks(self):
+        self.assertEqual(block_to_block_type("""```
+code here
+```"""), BlockType.CODE)
+        self.assertEqual(block_to_block_type("""```
+print('hi')
+print('bye')
+```"""), BlockType.CODE)
+        self.assertNotEqual(block_to_block_type("``\nnot a code block\n``"), BlockType.CODE)
+
+    def test_quote_blocks(self):
+        self.assertEqual(block_to_block_type("> quoted line"), BlockType.QUOTE)
+        self.assertEqual(block_to_block_type("> line1\n> line2"), BlockType.QUOTE)
+        self.assertNotEqual(block_to_block_type("> not quoted\nnot quoted"), BlockType.QUOTE)
+
+    def test_unordered_list_blocks(self):
+        self.assertEqual(block_to_block_type("- item1"), BlockType.UNORDERED_LIST)
+        self.assertEqual(block_to_block_type("- item1\n- item2"), BlockType.UNORDERED_LIST)
+        self.assertNotEqual(block_to_block_type("- item1\nitem2"), BlockType.UNORDERED_LIST)
+
+    def test_ordered_list_blocks(self):
+        self.assertEqual(block_to_block_type("1. first"), BlockType.ORDERED_LIST)
+        self.assertEqual(block_to_block_type("1. first\n2. second\n3. third"), BlockType.ORDERED_LIST)
+        self.assertNotEqual(block_to_block_type("1. first\n3. third"), BlockType.ORDERED_LIST)
+        self.assertNotEqual(block_to_block_type("0. zero\n1. one"), BlockType.ORDERED_LIST)
+        self.assertNotEqual(block_to_block_type("1. one\n2. two\n2. not incremented"), BlockType.ORDERED_LIST)
+        self.assertNotEqual(block_to_block_type("1. one\ntwo. not a number"), BlockType.ORDERED_LIST)
+
+    def test_paragraph_blocks(self):
+        self.assertEqual(block_to_block_type("Just some text."), BlockType.PARAGRAPH)
+        self.assertEqual(block_to_block_type("This is a paragraph\nwith multiple lines."), BlockType.PARAGRAPH)
+        self.assertEqual(block_to_block_type(""), BlockType.PARAGRAPH)
+        self.assertEqual(block_to_block_type("No special markdown here."), BlockType.PARAGRAPH)
+
+    def test_ambiguous_blocks(self):
+        # Looks like heading but too many hashes
+        self.assertEqual(block_to_block_type("####### Not heading"), BlockType.PARAGRAPH)
+        # Looks like code but not triple backtick
+        self.assertEqual(block_to_block_type("``\nnot code\n``"), BlockType.PARAGRAPH)
+        # Looks like unordered but one line is not
+        self.assertEqual(block_to_block_type("- item1\nnot a list"), BlockType.PARAGRAPH)
+        # Looks like ordered but numbering is wrong
+        self.assertEqual(block_to_block_type("1. one\n3. three"), BlockType.PARAGRAPH)
+
+from inline_markdown import block_to_block_type, BlockType
 
 if __name__ == "__main__":
     unittest.main()

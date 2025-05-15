@@ -1,6 +1,8 @@
 from textnode import TextNode, TextType
 from enum import Enum
 import re
+from htmlnode import ParentNode, LeafNode
+from textnode import text_node_to_html_node
 
 class BlockType(Enum):
     PARAGRAPH = "paragraph"
@@ -160,3 +162,72 @@ def markdown_to_blocks(markdown):
     result = [block.strip() for block in blocks if block.strip() != ""]
     return result
 
+# helper to convert inline text to HTMLNode children
+def text_to_children(text):
+    nodes = text_to_textnodes(text)
+    return [text_node_to_html_node(node) for node in nodes]
+
+def markdown_to_html_node(markdown):
+    """
+    Converts a full markdown document into a single parent HTMLNode.
+    """
+    blocks = markdown_to_blocks(markdown)
+    children = []
+    for block in blocks:
+        btype = block_to_block_type(block)
+        if btype == BlockType.PARAGRAPH:
+            content = block.replace("\n", " ")
+            inline_children = text_to_children(content)
+            children.append(ParentNode("p", inline_children))
+        elif btype == BlockType.HEADING:
+            match = re.match(r"^(#{1,6}) (.*)$", block)
+            level = len(match.group(1))
+            content = match.group(2)
+            inline_children = text_to_children(content)
+            children.append(ParentNode(f"h{level}", inline_children))
+        elif btype == BlockType.CODE:
+            lines = block.split("\n")
+            code_lines = lines[1:-1]
+            code_text = "\n".join(code_lines) + ("\n" if code_lines else "")
+            code_node = LeafNode("code", code_text)
+            children.append(ParentNode("pre", [code_node]))
+        elif btype == BlockType.UNORDERED_LIST:
+            lines = block.split("\n")
+            items = []
+            for line in lines:
+                content = line[2:].strip()
+                inline_children = text_to_children(content)
+                items.append(ParentNode("li", inline_children))
+            children.append(ParentNode("ul", items))
+        elif btype == BlockType.ORDERED_LIST:
+            lines = block.split("\n")
+            items = []
+            for line in lines:
+                m = re.match(r"^\d+\. (.*)$", line)
+                content = m.group(1)
+                inline_children = text_to_children(content)
+                items.append(ParentNode("li", inline_children))
+            children.append(ParentNode("ol", items))
+        elif btype == BlockType.QUOTE:
+            lines = block.split("\n")
+            text = " ".join(line.lstrip("> ").strip() for line in lines)
+            inline_children = text_to_children(text)
+            children.append(ParentNode("blockquote", inline_children))
+        else:
+            # fallback to paragraph
+            content = block.replace("\n", " ")
+            inline_children = text_to_children(content)
+            children.append(ParentNode("p", inline_children))
+    return ParentNode("div", children)
+
+# Extract the first-level heading from markdown text
+def extract_title(markdown: str) -> str:
+    """
+    Extracts the H1 header from markdown text. Raises ValueError if not found.
+    """
+    lines = markdown.splitlines()
+    for line in lines:
+        match = re.match(r"^# (.*)", line.lstrip())
+        if match:
+            return match.group(1).strip()
+    raise ValueError("No h1 header found")

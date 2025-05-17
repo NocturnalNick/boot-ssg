@@ -1,5 +1,6 @@
 import os
 import shutil
+from pathlib import Path
 from textnode import *
 from inline_markdown import markdown_to_html_node, extract_title
 
@@ -56,19 +57,54 @@ def generate_page(from_path, template_path, dest_path):
     with open(dest_path, 'w', encoding='utf-8') as f:
         f.write(html)
 
+def generate_pages_recursive(dir_path_content, template_path, dest_dir_path):
+    """
+    Recursively generate HTML pages from markdown files in the content directory.
+    
+    Args:
+        dir_path_content: Path to the content directory
+        template_path: Path to the HTML template file
+        dest_dir_path: Path to the public directory where HTML files will be written
+    """
+    # Ensure the destination directory exists
+    os.makedirs(dest_dir_path, exist_ok=True)
+    
+    # Process all items in the content directory
+    for item in os.listdir(dir_path_content):
+        src_path = os.path.join(dir_path_content, item)
+        
+        if os.path.isfile(src_path) and src_path.endswith('.md'):
+            # For markdown files, generate corresponding HTML
+            if item == 'index.md':
+                # For index.md, generate index.html in the current directory
+                dest_path = os.path.join(dest_dir_path, 'index.html')
+            else:
+                # For other markdown files, generate .html file in the same directory
+                dest_path = os.path.join(dest_dir_path, os.path.splitext(item)[0] + '.html')
+            
+            generate_page(src_path, template_path, dest_path)
+            
+        elif os.path.isdir(src_path):
+            # For directories, create corresponding directory in destination and recurse
+            new_dest_dir = os.path.join(dest_dir_path, item)
+            generate_pages_recursive(src_path, template_path, new_dest_dir)
+
 def main():
-    test = TextNode("This is some anchor text", "link", "https://www.boot.dev")
-    print(test)
-    # static assets are at project root/static
-    static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
-    public_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'public'))
-    copy_static(static_dir, public_dir)
-    # generate main index page
+    # Set up paths
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    generate_page(
-        os.path.join(project_root, 'content', 'index.md'),
-        os.path.join(project_root, 'template.html'),
-        os.path.join(public_dir, 'index.html')
-    )
+    static_dir = os.path.join(project_root, 'static')
+    public_dir = os.path.join(project_root, 'public')
+    content_dir = os.path.join(project_root, 'content')
+    template_path = os.path.join(project_root, 'template.html')
+    
+    # Clear and copy static files
+    print("Copying static files...")
+    copy_static(static_dir, public_dir)
+    
+    # Generate all pages recursively
+    print("Generating HTML pages...")
+    generate_pages_recursive(content_dir, template_path, public_dir)
+    
+    print("Site generation complete!")
 
 main()
